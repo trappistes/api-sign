@@ -90,7 +90,7 @@ $app->routeMiddleware([
    排序后的顺序是 `bar=2, foo=1, foo_bar=3, foobar=4`;
 2. 将排序好的参数名和参数值拼装在一起，根据上面的示例得到的结果为：`bar2foo1foo_bar3foobar4`;
 3. 把拼装好的字符串采用utf-8编码，使用签名算法对编码后的字符串进行摘要。如果使用MD5算法，则需要在拼装的字符串后加上app的secret后，再进行摘要。
-   如：`md5(bar2foo1foo_bar3foobar4 + secret)`,`hash_hmac('sha256', bar2foo1foo_bar3foobar4, secret)`;
+   如：`md5(bar2foo1foo_bar3foobar4 + secret)`,`hash_hmac('sha256', bar2foo1foo_bar3foobar4 + secret, secret)`;
 4. 将摘要得到的字节结果使用大写表示。如：`strtoupper($sign_string)`;
 5. 发送请求地址
 
