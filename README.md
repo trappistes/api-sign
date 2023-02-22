@@ -74,10 +74,10 @@ $app->routeMiddleware([
 
 |      参数名      |  类型  |   是否必须  |     描述    |
 |-----------------|--------|:----------:|------------|
-| app_key         | string |     是     | 应用Key                              |
+| access_key         | string |     是     | 应用Key                              |
 | sign_method     | string |     否     | 签名类型，默认：md5（支持md5,hmacsha256）       |
 | nonce           | string |     是     | 一次性验证随机字符串，长度1-32位任意字符（建议使用时间戳+随机字符串）   |
-| timestamp       | string |     是     | 签名时间戳，有效期30s（$ttl参数控制）                              |
+| timestamp       | string |     是     | 签名时间戳，有效期600s（$ttl参数控制）                              |
 | sign            | string |     是     | 签名字符串，参考签名规则                |
 
 #### 业务参数
@@ -110,4 +110,5 @@ Lumen
 $router->get('admin/profile', ['middleware' => ['sign','auth'], 'uses' => 'AdminController@showProfile']);
 ```
 
-#### AK管理（略）CURD自行车
+#### key & secret 管理（略）CURD自行实现
+Trappistes\ApiSign\Models\AccessKey;

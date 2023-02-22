@@ -2,6 +2,7 @@
 
 namespace Trappistes\ApiSign;
 
+use Illuminate\Support\Facades\Cache;
 use Trappistes\ApiSign\Models\AccessKey;
 use Validator;
 
@@ -13,8 +14,9 @@ class ApiSign
      * @var string[]
      */
     const ErrCodes = [
-        '1001' => '[app_key]缺失',
-        '1002' => '[app_key]不存在或无权限',
+        '1001' => '[access_key]缺失',
+        '1002' => '[access_key]不存在或无权限',
+        '1003' => '[access_key]已失效',
         '1011' => '[sign_method]错误',
         '1012' => '[sign]缺失',
         '1013' => '[sign]签名错误',
@@ -32,7 +34,7 @@ class ApiSign
      *
      * @var array
      */
-    protected array $params = [];
+    public array $params = [];
 
     /**
      * 签名加密方法
@@ -46,14 +48,14 @@ class ApiSign
      *
      * @var int $ttl
      */
-    protected int $ttl = 30;
+    protected int $ttl = 600;
 
     /**
      * 密钥
      *
-     * @var string $app_secret
+     * @var string $access_secret
      */
-    protected string $app_secret;
+    protected string $access_secret = '';
 
     /**
      * 进行校验
@@ -65,22 +67,38 @@ class ApiSign
         $this->params = request()->all();
 
         // 参数校验
-        $this->paramValidate();
+        $res = $this->paramValidate();
+
+        if ($res['status'] == false) {
+            return $res;
+        }
 
         // access_key校验
-        $this->appValidate();
+        $res = $this->appValidate();
+
+        if ($res['status'] == false) {
+            return $res;
+        }
 
         // 签名校验
-        $this->signValidate();
+        $res = $this->signValidate();
+
+        if ($res['status'] == false) {
+            return $res;
+        }
 
         // nonce校验
-        $this->nonceValidate();
+        $res = $this->nonceValidate();
+
+        if ($res['status'] == false) {
+            return $res;
+        }
 
         // nonce写入缓存
         Cache::tags(['nonces'])->put($this->params['access_key'] . '_nonce', $this->params['timestamp'], $this->ttl);
 
         // 成功返回
-        return ['$res_sign_validate'];
+        return $res;
     }
 
     /**
@@ -113,7 +131,13 @@ class ApiSign
             'sign.required' => '1012'
         ];
 
+        // 验证请求数据
         $result = Validator::make($this->params, $rules, $messages);
+
+        // 如果存在指定的加密方式时，覆盖默认设置
+        if (in_array('sign_method', $this->params)) {
+            $this->sign_method = $this->params['sign_method'];
+        }
 
         if ($result->fails()) {
             return $this->error($result->messages()->first());
@@ -129,9 +153,11 @@ class ApiSign
      */
     protected function nonceValidate(): array
     {
-        if (Cache::tags(['nonces'])->has($this->params['access_key'] . '_nonce')) {
-            return $this->error('1024');
-        }
+//        if (Cache::tags(['nonces'])->has($this->params['access_key'] . '_nonce')) {
+//            return $this->error('1024');
+//        } else {
+        return ['status' => true];
+//        }
     }
 
     /**
@@ -141,12 +167,15 @@ class ApiSign
      */
     protected function appValidate(): array
     {
-        $app = AccessKey::where('access_key', $this->params['access_key'])->first();
+        $key = AccessKey::where('access_key', $this->params['access_key'])->first();
 
-        if (!$app) {
+        if (!$key) {
             return $this->error('1002');
+        } elseif ($key['status'] == 0) {
+            return $this->error('1003');
         } else {
-            $this->app_secret = $app->app_secret;
+            $this->access_secret = $key->access_secret;
+            return ['status' => true];
         }
     }
 
@@ -157,24 +186,12 @@ class ApiSign
      */
     protected function signValidate(): array
     {
-        $signRes = $this->checkSign();
+        $str = $this->generateSign();
 
-        if (!$signRes || !$signRes['status']) {
-            return $this->error($signRes['code']);
+        if ($this->params['sign'] != $str) {
+            return $this->error('1013');
         } else {
             return ['status' => true];
-        }
-    }
-
-    /**
-     * 验证签名
-     *
-     * @return array
-     */
-    protected function checkSign(): array
-    {
-        if ($this->params['sign'] != $this->generateSign()) {
-            return $this->error('1013');
         }
     }
 
@@ -190,45 +207,34 @@ class ApiSign
     }
 
     /**
-     * 验证成功返回
-     *
-     * @return bool[]
-     */
-    protected function success(): array
-    {
-        return ['status' => true];
-    }
-
-
-    /**
      * 生成签名
      *
-     * @return string|false
+     * @return string
      */
-    private function generateSign($params): bool|string
+    public function generateSign(): string
     {
-        if (in_array('sign', $params)) {
-            unset($params['sign']);
-        }
-
         // 对参数进行排序
-        ksort($params);
+        ksort($this->params);
 
         $tmps = array();
 
         // 遍历参数，写入临时变量
-        foreach ($params as $k => $v) {
+        foreach ($this->params as $k => $v) {
+            // 跳过sign
+            if ($k == 'sign') {
+                continue;
+            }
             $tmps[] = $k . $v;
         }
 
         // 组合字符串
-        $string = implode('', $tmps) . $this->app_secret;
+        $string = implode('', $tmps) . $this->access_secret;
 
         // 判断加密方式
-        if ($params['sign_method'] === 'md5') {
+        if ($this->sign_method === 'md5') {
             return strtoupper(md5($string));
-        } elseif ($params['sign_method'] === 'hash') {
-            return strtoupper(hash_hmac('sha256', $string, $this->app_secret));
+        } elseif ($this->sign_method === 'hash') {
+            return strtoupper(hash_hmac('sha256', $string, $this->access_secret));
         }
     }
 }

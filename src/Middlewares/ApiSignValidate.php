@@ -5,8 +5,6 @@ namespace Trappistes\ApiSign\Middlewares;
 use Closure;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Trappistes\ApiSign\Facades\ApiSign;
-use Trappistes\ApiSign\Response;
-use function Couchbase\defaultDecoder;
 
 class ApiSignValidate
 {
@@ -17,14 +15,14 @@ class ApiSignValidate
      * @param Closure $next
      * @return mixed
      */
-    public function handle($request, Closure $next)
+    public function handle($request, Closure $next): mixed
     {
-        $valid = ApiSign::SignatureValidation();
+        $res = ApiSign::SignatureValidation();
 
-        if ($valid['status'] == true) {
+        if ($res['status'] == true) {
             return $next($request);
-        }else{
-            return response()->json($valid);
+        } else {
+            return response()->json($res);
         }
     }
 }
