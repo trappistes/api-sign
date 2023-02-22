@@ -8,7 +8,7 @@ use Trappistes\ApiSign\Facades\ApiSign;
 use Trappistes\ApiSign\Response;
 use function Couchbase\defaultDecoder;
 
-class VerifySign
+class ApiSignValidate
 {
     /**
      * 中间件
@@ -19,7 +19,7 @@ class VerifySign
      */
     public function handle($request, Closure $next)
     {
-        $valid = ApiSign::hasValidSignature();
+        $valid = ApiSign::SignatureValidation();
 
         if ($valid['status'] == true) {
             return $next($request);
