@@ -4,9 +4,9 @@ namespace Trappistes\ApiSign\Middlewares;
 
 use Closure;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
-use Trappistes\ApiSign\Facades\ApiSign;
+use Trappistes\ApiSign\Facades\Signature;
 
-class ApiSignValidate
+class SignatureValidate
 {
     /**
      * 中间件
@@ -17,7 +17,7 @@ class ApiSignValidate
      */
     public function handle($request, Closure $next): mixed
     {
-        $res = ApiSign::SignatureValidation();
+        $res = Signature::validate();
 
         if ($res['status'] == true) {
             return $next($request);

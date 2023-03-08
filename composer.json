@@ -16,10 +16,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Trappistes\\ApiSign\\ApiSignServiceProvider"
+                "Trappistes\\ApiSign\\SignatureServiceProvider"
             ],
             "aliases": {
-                "ApiSign": "Trappistes\\ApiSign\\Facade\\ApiSign"
+                "ApiSign": "Trappistes\\ApiSign\\Facade\\Signature"
             }
         }
     }

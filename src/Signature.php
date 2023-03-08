@@ -3,10 +3,10 @@
 namespace Trappistes\ApiSign;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Validator;
 use Trappistes\ApiSign\Models\AccessKey;
-use Validator;
 
-class ApiSign
+class Signature
 {
     /**
      * 错误码
@@ -17,7 +17,7 @@ class ApiSign
         '1001' => '[access_key]缺失',
         '1002' => '[access_key]不存在或无权限',
         '1003' => '[access_key]已失效',
-        '1011' => '[sign_method]错误',
+        '1011' => '[method]错误',
         '1012' => '[sign]缺失',
         '1013' => '[sign]签名错误',
         '1021' => '[nonce]缺失',
@@ -39,9 +39,9 @@ class ApiSign
     /**
      * 签名加密方法
      *
-     * @var string $sign_method
+     * @var string $method
      */
-    protected string $sign_method = 'md5';
+    protected string $method = 'md5';
 
     /**
      * 签名时间戳有效期(单位：秒)
@@ -62,9 +62,14 @@ class ApiSign
      *
      * @return array
      */
-    public function SignatureValidation(): array
+    public function validate(): array
     {
-        $this->params = request()->all();
+        // 获取header参数
+        $this->params['access_key'] = request()->header('Sign-Access-Key', null);
+        $this->params['method'] = request()->header('Sign-Method', $this->method);
+        $this->params['nonce'] = request()->header('Sign-Nonce', null);
+        $this->params['timestamp'] = request()->header('Sign-Timestamp', null);
+        $this->params['sign'] = request()->header('Sign-String', null);
 
         // 参数校验
         $res = $this->paramValidate();
@@ -88,14 +93,16 @@ class ApiSign
         }
 
         // nonce校验
-        $res = $this->nonceValidate();
+        if ($this->params['nonce']) {
+            $res = $this->nonceValidate();
 
-        if ($res['status'] == false) {
-            return $res;
+            if ($res['status'] == false) {
+                return $res;
+            }
+
+            // nonce写入缓存
+            Cache::tags(['nonces'])->put($this->params['access_key'] . '_nonce', $this->params['timestamp'], $this->ttl);
         }
-
-        // nonce写入缓存
-        Cache::tags(['nonces'])->put($this->params['access_key'] . '_nonce', $this->params['timestamp'], $this->ttl);
 
         // 成功返回
         return $res;
@@ -111,7 +118,7 @@ class ApiSign
         // 验证规则
         $rules = [
             'access_key' => 'required',
-            'sign_method' => 'in:,md5,hash',
+            'method' => 'required|in:,md5,hash',
             'nonce' => 'sometimes|required|string|min:1|max:32',
             'timestamp' => 'required|integer|between:' . time() - $this->ttl . ',' . time() + $this->ttl,
             'sign' => 'required',
@@ -120,7 +127,7 @@ class ApiSign
         // 验证消息
         $messages = [
             'access_key.required' => '1001',
-            'sign_method.in' => '1011',
+            'method.in' => '1011',
             'nonce.required' => '1021',
             'nonce.string' => '1022',
             'nonce.min' => '1023',
@@ -135,8 +142,8 @@ class ApiSign
         $result = Validator::make($this->params, $rules, $messages);
 
         // 如果存在指定的加密方式时，覆盖默认设置
-        if (in_array('sign_method', $this->params)) {
-            $this->sign_method = $this->params['sign_method'];
+        if (in_array('method', $this->params)) {
+            $this->method = $this->params['method'];
         }
 
         if ($result->fails()) {
@@ -153,11 +160,11 @@ class ApiSign
      */
     protected function nonceValidate(): array
     {
-//        if (Cache::tags(['nonces'])->has($this->params['access_key'] . '_nonce')) {
-//            return $this->error('1024');
-//        } else {
-        return ['status' => true];
-//        }
+        if (Cache::tags(['nonces'])->has($this->params['access_key'] . '_nonce')) {
+            return $this->error('1024');
+        } else {
+            return ['status' => true];
+        }
     }
 
     /**
@@ -230,10 +237,10 @@ class ApiSign
         // 组合字符串
         $string = implode('', $tmps) . $this->access_secret;
 
-        // 判断加密方式
-        if ($this->sign_method === 'md5') {
+        // 根据指定的加密方式进行加密，并转为全大写后返回
+        if ($this->method === 'md5') {
             return strtoupper(md5($string));
-        } elseif ($this->sign_method === 'hash') {
+        } elseif ($this->method === 'hash') {
             return strtoupper(hash_hmac('sha256', $string, $this->access_secret));
         }
     }

@@ -6,7 +6,7 @@ use Illuminate\Foundation\Application as Laravel;
 use Laravel\Lumen\Application as Lumen;
 use Illuminate\Support\ServiceProvider;
 
-class ApiSignServiceProvider extends ServiceProvider
+class SignatureServiceProvider extends ServiceProvider
 {
     /**
      * Register services.
@@ -15,8 +15,8 @@ class ApiSignServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->singleton('api-sign', function () {
-            return new ApiSign();
+        $this->app->singleton('signature', function () {
+            return new Signature();
         });
     }
 

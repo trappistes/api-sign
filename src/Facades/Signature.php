@@ -4,7 +4,7 @@ namespace Trappistes\ApiSign\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
-class ApiSign extends Facade
+class Signature extends Facade
 {
     /**
      * Get the registered name of the component.
@@ -13,6 +13,6 @@ class ApiSign extends Facade
      */
     protected static function getFacadeAccessor()
     {
-        return 'api-sign';
+        return 'signature';
     }
 }
