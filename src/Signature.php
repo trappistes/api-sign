@@ -4,7 +4,6 @@ namespace Trappistes\ApiSign;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
-use Trappistes\ApiSign\Models\AccessKey;
 
 class Signature
 {
@@ -17,16 +16,19 @@ class Signature
         '1001' => '[access_key]缺失',
         '1002' => '[access_key]不存在或无权限',
         '1003' => '[access_key]已失效',
-        '1011' => '[method]错误',
-        '1012' => '[sign]缺失',
-        '1013' => '[sign]签名错误',
-        '1021' => '[nonce]缺失',
-        '1022' => '[nonce]必须为字符串',
-        '1023' => '[nonce]长度必须为1-32位',
-        '1024' => '[nonce]已失效',
-        '1031' => '[timestamp]缺失',
-        '1032' => '[timestamp]已失效',
-        '1033' => '[timestamp]无效的时间戳',
+        '1011' => '[version]缺失',
+        '1012' => '[version]错误',
+        '1021' => '[signature]签名缺失',
+        '1022' => '[signature]签名错误',
+        '1031' => '[nonce]缺失',
+        '1032' => '[nonce]必须为字符串',
+        '1033' => '[nonce]长度必须为1-32位',
+        '1034' => '[nonce]已失效',
+        '1041' => '[timestamp]缺失',
+        '1042' => '[timestamp]已失效',
+        '1043' => '[timestamp]无效的时间戳',
+        '1051' => '[method]缺失',
+        '1052' => '[method]错误',
     ];
 
     /**
@@ -58,18 +60,45 @@ class Signature
     protected string $access_secret = '';
 
     /**
+     * The token model class name.
+     *
+     * @var string
+     */
+    public static $model = 'Trappistes\ApiSign\Models\AccessKey';
+
+    /**
+     * 自定义模型
+     *
+     * @param string $model
+     * @return void
+     */
+    public static function useModel($model)
+    {
+        static::$model = $model;
+    }
+
+    /**
+     * Get the token model class name.
+     *
+     * @return string
+     */
+    public static function model()
+    {
+        return static::$model;
+    }
+
+    /**
      * 进行校验
      *
      * @return array
      */
     public function validate(): array
     {
-        // 获取header参数
-        $this->params['access_key'] = request()->header('Sign-Access-Key', null);
-        $this->params['method'] = request()->header('Sign-Method', $this->method);
-        $this->params['nonce'] = request()->header('Sign-Nonce', null);
-        $this->params['timestamp'] = request()->header('Sign-Timestamp', null);
-        $this->params['sign'] = request()->header('Sign-String', null);
+        // 获取参数
+        $this->params = request()->query();
+
+        // 获取加密方式
+        $this->method = request()->get('Signature-Method', 'md5');
 
         // 参数校验
         $res = $this->paramValidate();
@@ -93,7 +122,7 @@ class Signature
         }
 
         // nonce校验
-        if ($this->params['nonce']) {
+        if ($this->params['Signature-Nonce']) {
             $res = $this->nonceValidate();
 
             if ($res['status'] == false) {
@@ -101,7 +130,7 @@ class Signature
             }
 
             // nonce写入缓存
-            Cache::tags(['nonces'])->put($this->params['access_key'] . '_nonce', $this->params['timestamp'], $this->ttl);
+            Cache::tags(['nonces'])->put($this->params['Signature-Access-Key'] . '-Nonce', $this->params['Signature-Timestamp'], $this->ttl);
         }
 
         // 成功返回
@@ -115,36 +144,41 @@ class Signature
      */
     protected function paramValidate(): array
     {
+        list($msec, $sec) = explode(' ', microtime());
+
+        $msectimes = substr((float)sprintf('%.0f', (floatval($msec) + floatval($sec)) * 1000), 0, 13);
+
         // 验证规则
         $rules = [
-            'access_key' => 'required',
-            'method' => 'required|in:,md5,hash',
-            'nonce' => 'sometimes|required|string|min:1|max:32',
-            'timestamp' => 'required|integer|between:' . time() - $this->ttl . ',' . time() + $this->ttl,
-            'sign' => 'required',
+            'Signature-Access-Key' => 'bail|required',
+            'Signature-Version' => 'bail|required|in:1.0',
+            'Signature-Nonce' => 'bail|sometimes|required|string|min:1|max:32',
+            'Signature-Timestamp' => 'bail|required|integer|between:' . $msectimes - $this->ttl * 1000 . ',' . $msectimes + $this->ttl * 1000,
+            'Signature' => 'bail|required',
+            'Signature-Method' => 'bail|required|in:,md5,hash',
         ];
 
         // 验证消息
         $messages = [
-            'access_key.required' => '1001',
-            'method.in' => '1011',
-            'nonce.required' => '1021',
-            'nonce.string' => '1022',
-            'nonce.min' => '1023',
-            'nonce.max' => '1023',
-            'timestamp.required' => '1031',
-            'timestamp.between' => '1032',
-            'timestamp.integer' => '1033',
-            'sign.required' => '1012'
+            'Signature-Access-Key.required' => '1001',
+            'Signature-Version.required' => '1011',
+            'Signature-Version.in' => '1012',
+            'Signature-Nonce.required' => '1031',
+            'Signature-Nonce.string' => '1032',
+            'Signature-Nonce.min' => '1033',
+            'Signature-Nonce.max' => '1033',
+            'Signature-Timestamp.required' => '1041',
+            'Signature-Timestamp.between' => '1042',
+            'Signature-Timestamp.integer' => '1043',
+            'Signature.required' => '1021',
+            'Signature-Method.required' => '1051',
+            'Signature-Method.in' => '1052',
+            'Format.required' => '1061',
+            'Format.in' => '1062',
         ];
 
         // 验证请求数据
         $result = Validator::make($this->params, $rules, $messages);
-
-        // 如果存在指定的加密方式时，覆盖默认设置
-        if (in_array('method', $this->params)) {
-            $this->method = $this->params['method'];
-        }
 
         if ($result->fails()) {
             return $this->error($result->messages()->first());
@@ -160,8 +194,8 @@ class Signature
      */
     protected function nonceValidate(): array
     {
-        if (Cache::tags(['nonces'])->has($this->params['access_key'] . '_nonce')) {
-            return $this->error('1024');
+        if (Cache::tags(['Signature-Nonce'])->has($this->params['Signature-Access-Key'] . '-Nonce')) {
+            return $this->error('1034');
         } else {
             return ['status' => true];
         }
@@ -174,13 +208,20 @@ class Signature
      */
     protected function appValidate(): array
     {
-        $key = AccessKey::where('access_key', $this->params['access_key'])->first();
+        // 获取模型
+        $model = app(self::model());
+        
+        $key = $model::where('access_key', $this->params['Signature-Access-Key'])->first();
 
         if (!$key) {
             return $this->error('1002');
         } elseif ($key['status'] == 0) {
             return $this->error('1003');
         } else {
+
+            // 向请求头中写入当前key
+            request()->headers->set('key', $key);
+
             $this->access_secret = $key->access_secret;
             return ['status' => true];
         }
@@ -195,8 +236,8 @@ class Signature
     {
         $str = $this->generateSign();
 
-        if ($this->params['sign'] != $str) {
-            return $this->error('1013');
+        if ($this->params['Signature'] != $str) {
+            return $this->error('1022');
         } else {
             return ['status' => true];
         }
@@ -228,7 +269,7 @@ class Signature
         // 遍历参数，写入临时变量
         foreach ($this->params as $k => $v) {
             // 跳过sign
-            if ($k == 'sign') {
+            if ($k == 'Signature') {
                 continue;
             }
             $tmps[] = $k . $v;

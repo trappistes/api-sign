@@ -70,15 +70,15 @@ $app->routeMiddleware([
 
 ## 使用
 
-#### 请求头
+#### 请求参数
 
 |      参数名      |  类型  |   是否必须  |     描述    |
 |-----------------|--------|:----------:|------------|
-| Sign-Access-Key         | string |     是     | 应用Key                              |
-| Sign-Method     | string |     否     | 签名类型，默认：md5（支持md5,hmacsha256）       |
-| Sign-Nonce           | string |     是     | 一次性验证随机字符串，长度1-32位任意字符（建议使用时间戳+随机字符串）   |
-| Sign-Timestamp       | string |     是     | 签名时间戳，有效期600s（$ttl参数控制）                              |
-| Sign-String            | string |     是     | 签名字符串，参考签名规则                |
+| Signature-Access-Key         | string |     是     | 应用Key                              |
+| Signature-Method     | string |     否     | 签名类型，默认：md5（支持md5,hmacsha256）       |
+| Signature-Nonce           | string |     是     | 一次性验证随机字符串，长度1-32位任意字符（建议使用时间戳+随机字符串）   |
+| Signature-Timestamp       | string |     是     | 签名时间戳，有效期600s（$ttl参数控制）                              |
+| Signature-String            | string |     是     | 签名字符串，参考签名规则                |
 
 #### 业务参数
 
@@ -87,11 +87,12 @@ $app->routeMiddleware([
 
 #### 签名方法
 
-1. 对除`sign`参数外的所有API请求参数（包括公共参数access_key,method,nonce,timestamp,(不含sign-string)和业务请求参数），根据参数名称的ASCII码表的顺序排序。 如：`foo=1, bar=2, foo_bar=3, foobar=4`
+1. 对除`sign`参数外的所有API请求参数（包括公共参数access_key,method,nonce,timestamp,(不含sign-string)和业务请求参数），根据参数名称的ASCII码表的顺序排序。
+   如：`foo=1, bar=2, foo_bar=3, foobar=4`
    排序后的顺序是 `bar=2, foo=1, foo_bar=3, foobar=4`;
 2. 将排序好的参数名和参数值拼装在一起，根据上面的示例得到的结果为：`bar2foo1foo_bar3foobar4`;
-3. 把拼装好的字符串采用utf-8编码，使用签名算法对编码后的字符串进行摘要;
-   如：`md5(bar2foo1foo_bar3foobar4 + secret)`,`hash_hmac('sha256', bar2foo1foo_bar3foobar4 + secret, secret)`;
+3. 把拼装好的字符串采用utf-8编码，使用签名算法对编码后的字符串进行摘要; 如：`md5(bar2foo1foo_bar3foobar4 + secret)`
+   ,`hash_hmac('sha256', bar2foo1foo_bar3foobar4 + secret, secret)`;
 4. 将摘要得到的字节结果使用大写表示。如：`strtoupper($sign_string)`;
 
 #### 后端校验方法
@@ -107,8 +108,9 @@ Route::resource('user',UserController::class)->middleware('sign');
 Lumen
 
 ```injectablephp
-$router->get('admin/profile', ['middleware' => ['sign','auth'], 'uses' => 'AdminController@showProfile']);
+$router->get('admin/profile','AdminController@showProfile'])->middleware('sign')
 ```
 
 #### key & secret 管理（略）CURD自行实现
+
 Trappistes\ApiSign\Models\AccessKey;

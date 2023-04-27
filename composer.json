@@ -1,26 +1,26 @@
 {
-    "name": "trappistes/api-sign",
-    "description": "Laravel API 签名校验",
-    "authors": [
-        {
-            "name": "Trappistes",
-            "email": "182050940@qq.com"
-        }
-    ],
-    "require": {},
-    "autoload": {
-        "psr-4": {
-            "Trappistes\\ApiSign\\": "src/"
-        }
-    },
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Trappistes\\ApiSign\\SignatureServiceProvider"
-            ],
-            "aliases": {
-                "ApiSign": "Trappistes\\ApiSign\\Facade\\Signature"
-            }
-        }
+  "name": "trappistes/api-sign",
+  "description": "Laravel API 签名校验",
+  "authors": [
+    {
+      "name": "Trappistes",
+      "email": "182050940@qq.com"
     }
+  ],
+  "require": {},
+  "autoload": {
+    "psr-4": {
+      "Trappistes\\ApiSign\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Trappistes\\ApiSign\\SignatureServiceProvider"
+      ],
+      "aliases": {
+        "ApiSign": "Trappistes\\ApiSign\\Facade\\Signature"
+      }
+    }
+  }
 }
