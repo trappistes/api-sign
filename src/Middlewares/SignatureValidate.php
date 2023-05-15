@@ -19,7 +19,7 @@ class SignatureValidate
     {
         $res = Signature::validate();
 
-        if ($res['status'] == true) {
+        if ($res['code'] == 200) {
             return $next($request);
         } else {
             return response()->json($res);

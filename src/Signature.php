@@ -103,21 +103,21 @@ class Signature
         // 参数校验
         $res = $this->paramValidate();
 
-        if ($res['status'] == false) {
+        if ($res['code'] !== 200) {
             return $res;
         }
 
         // access_key校验
         $res = $this->appValidate();
 
-        if ($res['status'] == false) {
+        if ($res['code'] !== 200) {
             return $res;
         }
 
         // 签名校验
         $res = $this->signValidate();
 
-        if ($res['status'] == false) {
+        if ($res['code'] !== 200) {
             return $res;
         }
 
@@ -125,7 +125,7 @@ class Signature
         if ($this->params['Signature-Nonce']) {
             $res = $this->nonceValidate();
 
-            if ($res['status'] == false) {
+            if ($res['code'] !== 200) {
                 return $res;
             }
 
@@ -183,7 +183,7 @@ class Signature
         if ($result->fails()) {
             return $this->error($result->messages()->first());
         } else {
-            return ['status' => true];
+            return $this->success();
         }
     }
 
@@ -197,7 +197,7 @@ class Signature
         if (Cache::tags(['Signature-Nonce'])->has($this->params['Signature-Access-Key'] . '-Nonce')) {
             return $this->error('1034');
         } else {
-            return ['status' => true];
+            return $this->success();
         }
     }
 
@@ -210,7 +210,7 @@ class Signature
     {
         // 获取模型
         $model = app(self::model());
-        
+
         $key = $model::where('access_key', $this->params['Signature-Access-Key'])->first();
 
         if (!$key) {
@@ -223,7 +223,7 @@ class Signature
             request()->headers->set('key', $key);
 
             $this->access_secret = $key->access_secret;
-            return ['status' => true];
+            return $this->success();
         }
     }
 
@@ -239,8 +239,18 @@ class Signature
         if ($this->params['Signature'] != $str) {
             return $this->error('1022');
         } else {
-            return ['status' => true];
+            return $this->success();
         }
+    }
+
+    /**
+     * 验证成功返回
+     *
+     * @return array
+     */
+    protected function success(): array
+    {
+        return ['code' => 200];
     }
 
     /**
@@ -251,7 +261,7 @@ class Signature
      */
     protected function error(string $code): array
     {
-        return ['status' => false, 'code' => $code, 'message' => self::ErrCodes[$code]];
+        return ['code' => $code, 'message' => self::ErrCodes[$code]];
     }
 
     /**
