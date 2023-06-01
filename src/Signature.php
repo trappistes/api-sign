@@ -2,6 +2,7 @@
 
 namespace Trappistes\ApiSign;
 
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
@@ -32,6 +33,26 @@ class Signature
     ];
 
     /**
+     * 模型名称.
+     *
+     * @var string
+     */
+    public static $model = 'Trappistes\ApiSign\Models\AccessKey';
+
+    /**
+     * 密钥字段名
+     *
+     * @var string
+     */
+    public string $key_field = 'access_key';
+
+    /**
+     * 密匙字段名
+     * @var string
+     */
+    public string $secret_field = 'access_secret';
+
+    /**
      * 请求参数
      *
      * @var array
@@ -60,11 +81,34 @@ class Signature
     protected string $access_secret = '';
 
     /**
-     * The token model class name.
-     *
-     * @var string
+     * @param null $key_field
+     * @param null $secret_field
      */
-    public static $model = 'Trappistes\ApiSign\Models\AccessKey';
+    public function __construct($key_field = null, $secret_field = null)
+    {
+        if (!empty($key_field)) $this->key_field = $key_field;
+        if (!empty($secret_field)) $this->secret_field = $secret_field;
+    }
+
+    /**
+     * 设置access_key字段
+     *
+     * @param string $str
+     */
+    public function setKeyField($str)
+    {
+        $this->key_field = $str;
+    }
+
+    /**
+     * 设置access_secret字段
+     *
+     * @param string $str
+     */
+    public function setSecretField($str)
+    {
+        $this->secret_field = $str;
+    }
 
     /**
      * 自定义模型
@@ -95,20 +139,29 @@ class Signature
     public function validate(): array
     {
         // 获取参数
-        $this->params = request()->query();
+        if (request()->has('Signature')) {
+            $params = request()->query();
+        } else if (request()->hasHeader('Signature')) {
+            $params = getallheaders();
+        } else {
+            return $this->error('1021');
+        }
 
-        // 获取加密方式
-        $this->method = request()->get('Signature-Method', 'md5');
+        // 获得需要验证的字段
+        $this->params = Arr::only($params, ['Signature-Access-Key', 'Signature-Version', 'Signature-Nonce', 'Signature-Timestamp', 'Signature', 'Signature-Method']);
 
         // 参数校验
         $res = $this->paramValidate();
+
+        // 获取加密方式
+        $this->method = $this->params['Signature-Method'];
 
         if ($res['code'] !== 200) {
             return $res;
         }
 
         // access_key校验
-        $res = $this->appValidate();
+        $res = $this->accessKeyValidate();
 
         if ($res['code'] !== 200) {
             return $res;
@@ -135,6 +188,34 @@ class Signature
 
         // 成功返回
         return $res;
+    }
+
+    /**
+     * 获取数据记录
+     *
+     * @return mixed
+     */
+    public function getAccessKey()
+    {
+        if (request()->has('Signature-Access-Key')) {
+            return request()->query('Signature-Access-Key','');
+        } else if (request()->hasHeader('Signature-Access-Key')) {
+            return request()->header('Signature-Access-Key','');
+        }
+    }
+
+    /**
+     * 获取数据记录
+     *
+     * @return mixed
+     */
+    public function accessKey($access_key = null)
+    {
+        // 获取模型
+        $model = app(self::model());
+
+        // 获取记录
+        return $model::where($this->key_field, $access_key ?? $this->params['Signature-Access-Key'])->first();
     }
 
     /**
@@ -206,25 +287,20 @@ class Signature
      *
      * @return array
      */
-    protected function appValidate(): array
+    protected function accessKeyValidate(): array
     {
-        // 获取模型
-        $model = app(self::model());
+        $key = $this->accessKey();
 
-        $key = $model::where('access_key', $this->params['Signature-Access-Key'])->first();
+        // 设置密匙
+        $this->access_secret = $key->{$this->secret_field};
 
         if (!$key) {
             return $this->error('1002');
         } elseif ($key['status'] == 0) {
             return $this->error('1003');
-        } else {
-
-            // 向请求头中写入当前key
-            request()->headers->set('key', $key);
-
-            $this->access_secret = $key->access_secret;
-            return $this->success();
         }
+
+        return $this->success();
     }
 
     /**
