@@ -132,24 +132,47 @@ class Signature
     }
 
     /**
+     * 设置参数
+     *
+     * @param array $param
+     * @return array|void
+     */
+    public function setParam(array $param = [])
+    {
+        if (array_key_exists('Signature', $param)) {
+            $this->params = $param;
+        } else {
+            // 获取参数
+            if (request()->has('Signature')) {
+                $params = request()->query();
+            } else if (request()->hasHeader('Signature')) {
+                $params = getallheaders();
+            } else {
+                return $this->error('1021');
+            }
+
+            // 获得需要验证的字段
+            $this->params = Arr::only($params, ['Signature-Access-Key', 'Signature-Version', 'Signature-Nonce', 'Signature-Timestamp', 'Signature', 'Signature-Method']);
+        }
+    }
+
+    /**
+     * 获取参数
+     *
+     * @return array
+     */
+    public function getParam(): array
+    {
+        return $this->params;
+    }
+
+    /**
      * 进行校验
      *
      * @return array
      */
     public function validate(): array
     {
-        // 获取参数
-        if (request()->has('Signature')) {
-            $params = request()->query();
-        } else if (request()->hasHeader('Signature')) {
-            $params = getallheaders();
-        } else {
-            return $this->error('1021');
-        }
-
-        // 获得需要验证的字段
-        $this->params = Arr::only($params, ['Signature-Access-Key', 'Signature-Version', 'Signature-Nonce', 'Signature-Timestamp', 'Signature', 'Signature-Method']);
-
         // 参数校验
         $res = $this->paramValidate();
 
@@ -198,9 +221,9 @@ class Signature
     public function getAccessKey()
     {
         if (request()->has('Signature-Access-Key')) {
-            return request()->query('Signature-Access-Key','');
+            return request()->query('Signature-Access-Key', '');
         } else if (request()->hasHeader('Signature-Access-Key')) {
-            return request()->header('Signature-Access-Key','');
+            return request()->header('Signature-Access-Key', '');
         }
     }
 

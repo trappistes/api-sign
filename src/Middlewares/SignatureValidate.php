@@ -4,7 +4,7 @@ namespace Trappistes\ApiSign\Middlewares;
 
 use Closure;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
-use Trappistes\ApiSign\Facades\Signature;
+use Trappistes\ApiSign\Signature;
 
 class SignatureValidate
 {
@@ -17,7 +17,11 @@ class SignatureValidate
      */
     public function handle($request, Closure $next): mixed
     {
-        $res = Signature::validate();
+        $signature = new Signature();
+
+        $signature->setParam();
+
+        $res = $signature->validate();
 
         if ($res['code'] == 200) {
             return $next($request);
