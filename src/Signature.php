@@ -206,7 +206,7 @@ class Signature
             }
 
             // nonce写入缓存
-            Cache::tags(['nonces'])->put($this->params['Signature-Access-Key'] . '-Nonce', $this->params['Signature-Timestamp'], $this->ttl);
+            Cache::put('Nonce-' . $this->params['Signature-Access-Key'] . '-' . $this->params['Signature-Nonce'], $this->params['Signature-Timestamp'], $this->ttl);
         }
 
         // 成功返回
@@ -298,7 +298,7 @@ class Signature
      */
     protected function nonceValidate(): array
     {
-        if (Cache::tags(['Signature-Nonce'])->has($this->params['Signature-Access-Key'] . '-Nonce')) {
+        if (Cache::has('Nonce-' . $this->params['Signature-Access-Key'] . '-' . $this->params['Signature-Nonce'])) {
             return $this->error('1034');
         } else {
             return $this->success();
